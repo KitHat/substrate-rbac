@@ -31,7 +31,6 @@ The naive implementation would be to implement all state changes (role creation,
 
 * `assign_role(AccountId, RoleId)` -- adds a role to a user. Must check that caller has needed role to provide this access.
 * `revoke_role(AccountId, RoleId)` -- removes a role to a user. Must check that caller has needed role to provide this access.
-* `authorize(AccountId, RoleId)` -- checks if a user has this role. This is called `authorize` because it is intended to be called from other pallets and for them it is basically an authorization.
 
 ## Implementation details
 
@@ -47,6 +46,13 @@ It means the we need an additional call for this pallet that *will not be an ext
 `add_role(RoleId, RoleInfo)` -- adds a role with a specified name and list of roles that can grant it.
 
 Ideally it should be represented through the trait to abstract out pallet from the RBAC implementation and make it replaceable. Trait should be placed in some common crate. 
+
+### Authorization
+
+Pallets will need to check if user is authorized against some role. It is definitely not an extrinsic (as it is not a transaction), so we need to make a getter-ish function for this pallet that will check if user has this role.
+
+* `authorize(AccountId, RoleId) -> bool` -- checks if a user has this role. This is called `authorize` because it is intended to be called from other pallets and for them it is basically an authorization.
+
 
 ### Data Initialization
 
