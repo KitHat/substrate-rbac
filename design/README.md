@@ -32,6 +32,15 @@ The naive implementation would be to implement all state changes (role creation,
 * `assign_role(AccountId, RoleId)` -- adds a role to a user. Must check that caller has needed role to provide this access.
 * `revoke_role(AccountId, RoleId)` -- removes a role to a user. Must check that caller has needed role to provide this access.
 
+### Events
+
+* `RoleGranted(AccountId, RoleId)` -- role is granted to the user
+* `RoleRevoked(AccountId, RoleId)` -- role is revoked from the user
+
+### Errors
+
+* `NotAuthorized(AccountId)` -- user is not authorized for this action
+
 ## Implementation details
 
 ### Role definition
