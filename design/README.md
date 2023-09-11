@@ -39,7 +39,7 @@ The naive implementation would be to implement all state changes (role creation,
 
 ### Errors
 
-* `NotAuthorized(AccountId)` -- user is not authorized for this action
+* `NotAuthorized` -- user is not authorized for this action
 
 ## Implementation details
 
@@ -60,7 +60,7 @@ Ideally it should be represented through the trait to abstract out pallet from t
 
 Pallets will need to check if user is authorized against some role. It is definitely not an extrinsic (as it is not a transaction), so we need to make a getter-ish function for this pallet that will check if user has this role.
 
-* `authorize(AccountId, RoleId) -> bool` -- checks if a user has this role. This is called `authorize` because it is intended to be called from other pallets and for them it is basically an authorization.
+* `authorize(AccountId, &[RoleId]) -> bool` -- checks if a user has the role from the list of roles. It will allow pallet to check user for the list of roles who are allowed for some action. This is called `authorize` because it is intended to be called from other pallets and for them it is basically an authorization.
 
 
 ### Data Initialization
