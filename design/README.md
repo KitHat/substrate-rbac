@@ -12,11 +12,11 @@ We have three ways how we can implement an RBAC pallet:
         * easy to use and understand
         * RBAC pallet becomes more agnostic to other pallets and provide general functionality
     * Cons
-        * problems with role assignment -- we would have to have some restriction for each role which account can grant this role. It does not look clean
+        * problems with role assignment -- we would have to have some restriction for each role which account can grant this role. It does look like a hack (we are building role functionality and do not use it ourselves)
         * such approach is error-prone (e.g. you can lose keys for role granters, assign a wrong user for role grant)
 * Complex role system (roles are nested in terms of grant and revokation):
     * Pros:
-        * allows to make intuitive role systems (role hierarchy is built smoothly)
+        * allows to make intuitive role systems (role hierarchy is built smoothly with such approach)
         * approach is less error-prone (it is easier for users to manage roles than accounts)
     * Cons:
         * takes more time to implement than the first approach, requires more complex types for roles
@@ -28,7 +28,7 @@ We have three ways how we can implement an RBAC pallet:
         * it will take considerably more time to implement
         * for some users such role system may be overcomplicated (e.g. a number of users would avoid using KeyCloak for their role management because of such approach)
 
-We need to make a choice. For the work task purposes I chose the second option, because it is a balance of better desicions and time consumption. Also it makes the best fit for the task stated in the document. However, for the real project I would push for the third option and would implement a permission-based system.
+For the work task purposes I chose the second option, because it is a balance of better desicions and time consumption. Also it makes the best fit for the task stated in the document. However, for the real project I would push for the third option and would implement a permission-based system -- from my point of view it is a good idea to divide permissions and roles.
 
 ### Functionality breakdown
 
