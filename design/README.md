@@ -2,6 +2,36 @@
 
 ## Motivation
 
+### Possible approaches
+
+We have three ways how we can implement an RBAC pallet:
+
+* Simple role system (roles are not nested in terms of grant and revokation)
+    * Pros:
+        * really fast to implement
+        * easy to use and understand
+        * RBAC pallet becomes more agnostic to other pallets and provide general functionality
+    * Cons
+        * problems with role assignment -- we would have to have some restriction for each role which account can grant this role. It does not look clean
+        * such approach is error-prone (e.g. you can lose keys for role granters, assign a wrong user for role grant)
+* Complex role system (roles are nested in terms of grant and revokation):
+    * Pros:
+        * allows to make intuitive role systems (role hierarchy is built smoothly)
+        * approach is less error-prone (it is easier for users to manage roles than accounts)
+    * Cons:
+        * takes more time to implement than the first approach, requires more complex types for roles
+* Layered role systems (permissions are used to restrict access to functionality, roles are basically a set of permissions)
+    * Pros:
+        * the most flexible approach -- it makes other pallets agnostic to roles and makes them use permissions to restrict the functionality, that looks more intuitive for developers
+        * role becomes a set of permissions that explains what it can do and makes easy to check what it can't do
+    * Cons:
+        * it will take considerably more time to implement
+        * for some users such role system may be overcomplicated (e.g. a number of users would avoid using KeyCloak for their role management because of such approach)
+
+We need to make a choice. For the work task purposes I chose the second option, because it is a balance of better desicions and time consumption. Also it makes the best fit for the task stated in the document. However, for the real project I would push for the third option and would implement a permission-based system.
+
+### Functionality breakdown
+
 The RBAC pallet should provide the functionality of:
 
 * Store the list of roles
