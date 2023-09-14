@@ -105,4 +105,8 @@ Tight coupling has some advantages: faster to implement (no need to create trait
 
 ### `PreassignRole` trait
 
-This is one of the decisions I don't like. I tried to make a design that would be agnostic to accounts but during the implementation I have noticed a flaw in it. I can't start a role without a first user in it. I have made a quick implementation for it, but in a real project I would have gone back to the design phase and tried to think of a better solution. 
+This is one of the decisions I don't like. I tried to make a design that would be agnostic to accounts but during the implementation I have noticed a flaw in it. I can't start a role without a first user in it. I have made a quick implementation for it, but in a real project I would have gone back to the design phase and tried to think of a better solution.
+
+## References
+
+I have used a [timestamp pallet](https://github.com/paritytech/polkadot-sdk/tree/master/substrate/frame/timestamp) built by Parity as a reference for the pallet implementation.
