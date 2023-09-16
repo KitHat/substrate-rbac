@@ -51,9 +51,8 @@
 //! 	pub trait Config: frame_system::Config {
 //!         // other fields from config
 //!         type RoleId: MaxEncodedLen + Decode + EncodeLike + TypeInfo + Default + Clone;
-//!         type RoleInfo: rbac::RoleInfo<Self::RoleId>;
 //!         type RBAC: rbac::Authorize<Self::AccountId, Self::RoleId>
-//! 			+ rbac::AddRole<Self::RoleInfo, Self::RoleId>
+//! 			+ rbac::AddRole<Self::RoleId>
 //! 			+ rbac::PreassignRole<Self::AccountId, Self::RoleId>;
 //!         type AdminAccount: Get<Self::AccountId>;
 //!     }
@@ -77,10 +76,9 @@
 //!     #[pallet::hooks]
 //! 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 //!         fn on_runtime_upgrade() -> Weight {
-//!             let role_info =
-//! 				<T::RoleInfo as rbac::RoleInfo<T::RoleId>>::new("admin".as_bytes(), &[]);
 //! 			let role_id =
-//! 				<T::RBAC as rbac::AddRole<T::RoleInfo, T::RoleId>>::add_role(role_info, true);
+//! 				<T::RBAC as rbac::AddRole<T::RoleId>>::add_role("admin".as_bytes(), &[], true)
+//! 			        .expect("incorrect role created");
 //! 			NeededRole::<T>::set(role_id.clone());
 //! 			<T::RBAC as rbac::PreassignRole<T::AccountId, T::RoleId>>::preassign_role(
 //! 				T::AdminAccount::get(),
@@ -121,6 +119,13 @@ pub mod pallet {
     use frame_system::pallet_prelude::*;
     use scale_info::TypeInfo;
 
+    #[derive(Clone, Debug, Encode, Decode, MaxEncodedLen, PartialEqNoBound, TypeInfo)]
+    #[scale_info(skip_type_params(LN, LG))]
+    pub struct RoleInfo<T: TypeInfo + Debug + PartialEq, LN: Get<u32>, LG: Get<u32>> {
+        pub name: BoundedVec<u8, LN>,
+        pub granters: BoundedVec<T, LG>,
+    }
+
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
@@ -140,7 +145,12 @@ pub mod pallet {
     /// Storage for role information
     #[pallet::storage]
     #[pallet::getter(fn roles)]
-    pub type Roles<T: Config> = StorageMap<_, Blake2_128Concat, T::RoleId, T::RoleInfo>;
+    pub type Roles<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        T::RoleId,
+        RoleInfo<T::RoleId, T::NameMaxLength, T::GrantersListMaxLength>,
+    >;
 
     /// Storage with the latest role id. Used for ensure that there won't be collisions with role generation.
     #[pallet::storage]
@@ -151,7 +161,7 @@ pub mod pallet {
     pub trait Config: frame_system::Config {
         /// Runtime's definition of an event.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-        // Type representing the weight of this pallet
+        /// Type representing the weight of this pallet
         type WeightInfo: WeightInfo;
         /// Type used for role identification
         type RoleId: Clone
@@ -164,22 +174,20 @@ pub mod pallet {
             + MaxEncodedLen
             + TypeInfo
             + Incrementable;
-        /// Type used for role description
-        type RoleInfo: Clone
-            + Debug
-            + Decode
-            + EncodeLike
-            + Eq
-            + MaxEncodedLen
-            + TypeInfo
-            + RoleInfo<Self::RoleId>;
+        /// Maximum length of role name
+        type NameMaxLength: Get<u32> + Clone + Debug;
+        /// Maximum length of granters list
+        type GrantersListMaxLength: Get<u32> + Clone + Debug;
     }
 
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
         /// Role was created
-        RoleCreated { id: T::RoleId, info: T::RoleInfo },
+        RoleCreated {
+            id: T::RoleId,
+            info: RoleInfo<T::RoleId, T::NameMaxLength, T::GrantersListMaxLength>,
+        },
         /// Role was granted to the user
         RoleGranted {
             user: T::AccountId,
@@ -232,7 +240,7 @@ pub mod pallet {
                 Err(Error::<T>::RoleNotExist)?
             };
 
-            if !Pallet::<T>::authorize(&who, role.granters()) {
+            if !Pallet::<T>::authorize(&who, role.granters.as_slice()) {
                 Err(Error::<T>::NotAuthorized)?
             }
 
@@ -272,7 +280,7 @@ pub mod pallet {
                 Err(Error::<T>::RoleNotExist)?
             };
 
-            if !Pallet::<T>::authorize(&who, role.granters()) {
+            if !Pallet::<T>::authorize(&who, role.granters.as_slice()) {
                 Err(Error::<T>::NotAuthorized)?
             }
 
@@ -295,21 +303,42 @@ pub mod pallet {
         }
     }
 
-    impl<T: Config> AddRole<T::RoleInfo, T::RoleId> for Pallet<T> {
-        fn add_role(mut role: T::RoleInfo, can_assign_itself: bool) -> T::RoleId {
+    impl<T: Config> AddRole<T::RoleId> for Pallet<T> {
+        fn add_role(
+            name: &[u8],
+            granters: &[T::RoleId],
+            can_assign_itself: bool,
+        ) -> Result<T::RoleId, InterfaceError> {
             let next_id = IdGenerator::<T>::mutate(|id| {
                 *id = id.increment();
                 *id
             });
-            if can_assign_itself {
-                role.add_granter(next_id);
-            }
+            let granters = if can_assign_itself {
+                [granters, &[next_id]].concat()
+            } else {
+                granters.to_vec()
+            };
+            let role = RoleInfo {
+                name: name
+                    .to_vec()
+                    .try_into()
+                    .map_err(|_| InterfaceError::NameTooLong {
+                        expected: T::NameMaxLength::get(),
+                        observed: name.len(),
+                    })?,
+                granters: granters.clone().try_into().map_err(|_| {
+                    InterfaceError::GrantersListTooLong {
+                        expected: T::GrantersListMaxLength::get(),
+                        observed: granters.len(),
+                    }
+                })?,
+            };
             Roles::<T>::set(next_id, Some(role.clone()));
             Self::deposit_event(Event::RoleCreated {
                 id: next_id,
                 info: role,
             });
-            next_id
+            Ok(next_id)
         }
     }
 

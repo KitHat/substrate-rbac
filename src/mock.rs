@@ -1,10 +1,5 @@
 use crate as pallet_rbac;
-use codec::{Decode, Encode, MaxEncodedLen};
-use frame_support::{
-    storage::bounded_vec::BoundedVec,
-    traits::{ConstU16, ConstU64},
-};
-use scale_info::TypeInfo;
+use frame_support::traits::{ConstU16, ConstU64};
 use sp_core::{ConstU32, H256};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
@@ -48,40 +43,16 @@ impl frame_system::Config for Test {
     type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
-#[derive(Clone, Debug, Encode, Decode, Eq, MaxEncodedLen, PartialEq, TypeInfo)]
-pub struct RoleInfo {
-    pub name: BoundedVec<u8, ConstU32<20>>,
-    pub granters: BoundedVec<u32, ConstU32<20>>,
-}
-
 type RoleId = u32;
-
-impl pallet_rbac::RoleInfo<RoleId> for RoleInfo {
-    fn new(name: &[u8], granters: &[RoleId]) -> Self {
-        RoleInfo {
-            name: name.to_vec().try_into().unwrap(),
-            granters: granters.to_vec().try_into().unwrap(),
-        }
-    }
-
-    fn granters(&self) -> &[RoleId] {
-        &self.granters
-    }
-
-    fn name(&self) -> &[u8] {
-        &self.name
-    }
-
-    fn add_granter(&mut self, new_granter: RoleId) {
-        self.granters.try_push(new_granter).unwrap()
-    }
-}
+pub type NameMaxLength = ConstU32<20>;
+pub type GrantersListMaxLength = ConstU32<20>;
 
 impl pallet_rbac::Config for Test {
     type RuntimeEvent = RuntimeEvent;
     type WeightInfo = ();
     type RoleId = RoleId;
-    type RoleInfo = RoleInfo;
+    type GrantersListMaxLength = GrantersListMaxLength;
+    type NameMaxLength = NameMaxLength;
 }
 
 // Build genesis storage according to the mock runtime.
