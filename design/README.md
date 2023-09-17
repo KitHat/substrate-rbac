@@ -67,7 +67,7 @@ The naive implementation would be to implement all state changes (role creation,
 
 * `RoleGranted(AccountId, RoleId)` -- role is granted to the user
 * `RoleRevoked(AccountId, RoleId)` -- role is revoked from the user
-* `RoleCreated(AccountId, RoleInfo)` -- role is revoked from the user
+* `RoleCreated(AccountId, RoleInfo)` -- new role is created
 
 ### Errors
 

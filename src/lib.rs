@@ -119,10 +119,13 @@ pub mod pallet {
     use frame_system::pallet_prelude::*;
     use scale_info::TypeInfo;
 
+    /// Struct representing the role metadata
     #[derive(Clone, Debug, Encode, Decode, MaxEncodedLen, PartialEqNoBound, TypeInfo)]
     #[scale_info(skip_type_params(LN, LG))]
     pub struct RoleInfo<T: TypeInfo + Debug + PartialEq, LN: Get<u32>, LG: Get<u32>> {
+        /// Role name
         pub name: BoundedVec<u8, LN>,
+        ///Role granters
         pub granters: BoundedVec<T, LG>,
     }
 
