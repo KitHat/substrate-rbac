@@ -50,12 +50,13 @@ The naive implementation would be to implement all state changes (role creation,
 
 * `AccountId` - will be taken from `frame_system::Config`. Basically it is an associated type from system config.
 * `RoleId` - id that you can check the role by. It should be to other pallets as they will need to create their own roles.
-* `RoleInfo` - a value that consists from name and list of roles that can grant it. It should be represented to other pallets as they will need to create their own roles. 
+* `RoleInfo` - a value that consists from name and list of roles that can grant it. 
 
 ### Storages
 
 * `Roles` - a list of roles that exist. Can't be changed by extrinsic.
 * `Assignments` - a mapping from user to a list of roles that they are assigned to. Can be changed by extrinsic
+* `IdGenerator` - a storage for the next id.
 
 ### Extrinsics
 
@@ -66,6 +67,7 @@ The naive implementation would be to implement all state changes (role creation,
 
 * `RoleGranted(AccountId, RoleId)` -- role is granted to the user
 * `RoleRevoked(AccountId, RoleId)` -- role is revoked from the user
+* `RoleCreated(AccountId, RoleInfo)` -- new role is created
 
 ### Errors
 
@@ -82,7 +84,7 @@ Here comes some additional requirements:
 
 It means the we need an additional call for this pallet that *will not be an extrinsic*:
 
-`add_role(RoleId, RoleInfo)` -- adds a role with a specified name and list of roles that can grant it.
+`add_role(name: &[u8], granters: &[RoleId], can_assign_itself: bool) -> Result<RoleId, Error>` -- adds a role with a specified name and list of roles that can grant it.
 
 Ideally it should be represented through the trait to abstract out pallet from the RBAC implementation and make it replaceable. Trait should be placed in some common crate. 
 

@@ -1,31 +1,6 @@
 // The traits below are created to allow loose coupling between RBAC pallets and its consumers.
 // Ideally they should be placed in some common crate and imported from it by implementers and by comsu,ers.
 
-/// Trait describing the role
-pub trait RoleInfo<Id> {
-    /// Create a new instance of RoleInfo
-    ///
-    /// **Parameters**:
-    /// - `name`: slice of bytes representing the name
-    /// - `granters`: slice of role ids
-    ///
-    /// **Returns**: a new instance of RoleInfo
-    fn new(name: &[u8], granters: &[Id]) -> Self;
-    /// Role name
-    ///
-    /// **Returns**: slice of bytes representing the name
-    fn name(&self) -> &[u8];
-    /// Roles who can grant the role
-    ///
-    /// **Returns**: slice of role ids
-    fn granters(&self) -> &[Id];
-    /// Adds a granter to the role (used in case of self-granting role)
-    ///
-    /// **Parameters**:
-    /// - `new_granter`: id of role that can grant it   
-    fn add_granter(&mut self, new_granter: Id);
-}
-
 /// Trait describing the authorization call
 pub trait Authorize<AId, RId> {
     /// Authorize the user against some role list
@@ -37,16 +12,21 @@ pub trait Authorize<AId, RId> {
 }
 
 /// Trait describing the add role call
-pub trait AddRole<Info, Id> {
+pub trait AddRole<Id> {
     /// Add a new role to the role list
     /// This should be called only from `GenesisBuild` or `Hooks::on_runtime_upgrade`
     ///
     /// **Parameters**:
-    /// - `role`: role information
+    /// - `name`: slice of bytes representing the role name
+    /// - `granters`: slice of ids who can grant the role
     /// - `can_assign_itself`: if set to true, then after id generation it will be added as a granter to role
     ///
     /// **Returns**: generated role id
-    fn add_role(role: Info, can_assign_itself: bool) -> Id;
+    fn add_role(
+        name: &[u8],
+        granters: &[Id],
+        can_assign_itself: bool,
+    ) -> Result<Id, InterfaceError>;
 }
 
 /// Trait describing the preassign role call
@@ -63,7 +43,9 @@ pub trait PreassignRole<AId, RId> {
     fn preassign_role(user: AId, role: RId) -> Result<(), InterfaceError>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum InterfaceError {
     RoleNotExist,
+    NameTooLong { expected: u32, observed: usize },
+    GrantersListTooLong { expected: u32, observed: usize },
 }

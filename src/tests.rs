@@ -1,20 +1,19 @@
 use crate::{
-    mock::{new_test_ext, RBACModule, RoleInfo as Role, RuntimeOrigin, System, Test},
-    AddRole, Authorize, Error, Event, PreassignRole, RoleInfo,
+    mock::{
+        new_test_ext, GrantersListMaxLength, NameMaxLength, RBACModule, RuntimeOrigin, System, Test,
+    },
+    AddRole, Authorize, Error, Event, InterfaceError, PreassignRole,
 };
 use frame_support::{assert_noop, assert_ok};
+use sp_core::Get;
 
 /// Add two roles and check that their ids are different
 #[test]
 fn test_role_add() {
     new_test_ext().execute_with(|| {
-        let role_1 = Role::new("role_1".as_bytes(), &[]);
+        let role_id_1 = RBACModule::add_role("role_1".as_bytes(), &[], true).unwrap();
 
-        let role_id_1 = RBACModule::add_role(role_1, true);
-
-        let role_2 = Role::new("role_2".as_bytes(), &[role_id_1]);
-
-        let role_id_2 = RBACModule::add_role(role_2, false);
+        let role_id_2 = RBACModule::add_role("role_2".as_bytes(), &[role_id_1], false).unwrap();
 
         assert!(role_id_1 != role_id_2);
     });
@@ -26,18 +25,14 @@ fn test_role_add() {
 fn test_grant_revoke_and_authorize() {
     new_test_ext().execute_with(|| {
         // Add admin role
-        let role_admin = Role::new("admin".as_bytes(), &[]);
-
-        let role_id_admin = RBACModule::add_role(role_admin, true);
+        let role_id_admin = RBACModule::add_role("admin".as_bytes(), &[], true).unwrap();
 
         let account_id_admin = 1_u64;
 
         RBACModule::preassign_role(account_id_admin, role_id_admin).unwrap();
 
         // Add user role
-        let role_user = Role::new("user".as_bytes(), &[role_id_admin]);
-
-        let role_id_user = RBACModule::add_role(role_user, true);
+        let role_id_user = RBACModule::add_role("user".as_bytes(), &[role_id_admin], true).unwrap();
 
         // Set the block number so event get written to the chain
         System::set_block_number(1);
@@ -85,9 +80,7 @@ fn test_grant_revoke_and_authorize() {
 fn test_grant_not_authorized() {
     new_test_ext().execute_with(|| {
         // Create a role
-        let role_admin = Role::new("admin".as_bytes(), &[]);
-
-        let role_id_admin = RBACModule::add_role(role_admin, true);
+        let role_id_admin = RBACModule::add_role("admin".as_bytes(), &[], true).unwrap();
 
         // This user is not authorized to grant this role
         let account_id_not_authorized = 2_u64;
@@ -112,6 +105,7 @@ fn test_grant_not_authorized() {
     });
 }
 
+// Grant a role that does not exist. Should throw an error
 #[test]
 fn test_grant_role_not_exists() {
     new_test_ext().execute_with(|| {
@@ -130,6 +124,38 @@ fn test_grant_role_not_exists() {
                 non_existent_role,
             ),
             Error::<Test>::RoleNotExist
+        );
+    });
+}
+
+// Add a role with a name too long and check the error
+#[test]
+fn test_too_long_name() {
+    new_test_ext().execute_with(|| {
+        let too_long_name = "adminadminadminadminadmin";
+        assert_eq!(
+            RBACModule::add_role(too_long_name.as_bytes(), &[], true),
+            Err(InterfaceError::NameTooLong {
+                expected: NameMaxLength::get(),
+                observed: too_long_name.len()
+            })
+        );
+    });
+}
+
+// Add a role with a name too long and check the error
+#[test]
+fn test_too_many_granters() {
+    new_test_ext().execute_with(|| {
+        let too_many_granters = [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+        ];
+        assert_eq!(
+            RBACModule::add_role("admin".as_bytes(), &too_many_granters, false),
+            Err(InterfaceError::GrantersListTooLong {
+                expected: GrantersListMaxLength::get(),
+                observed: too_many_granters.len()
+            })
         );
     });
 }

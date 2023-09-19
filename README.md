@@ -19,6 +19,18 @@ The Role-based Access Control allows other pallets to build their role systems a
 
 ## Usage
 
+### Role system example
+
+For example let's take a role system for some press release pallet.
+
+We have three kinds of users:
+
+* Admin: starts and finishes a new press release, manages the whole lifecycle. Can be granted only by other Admin.
+* Moderator: approves or rejects the writings for the press-release. Can be granted only be Admins.
+* Writer: creates and edits writing pieces. Can be granted by Admins and Moderators.
+
+Later in the code sample I will show how we can code these roles.
+
 ### Prerequisites
 
 Import the traits from pallet to your pallet, create a type in config to initiate it from the runtime crate.
@@ -35,63 +47,113 @@ To challenge user against the role list you should use `authorize` public call. 
 ```rust
 #[frame_support::pallet]
 pub mod pallet {
-	use super::*;
+    use super::*;
     use pallet_rbac as rbac;
-	use frame_support::pallet_prelude::*;
-	use frame_system::pallet_prelude::*;
+    use frame_support::pallet_prelude::*;
+    use frame_system::pallet_prelude::*;
     use codec::EncodeLike;
 
-	#[pallet::pallet]
-	pub struct Pallet<T>(_);
+    #[pallet::pallet]
+    pub struct Pallet<T>(_);
 
     #[pallet::storage]
-    pub type NeededRole<T: Config> = StorageValue<_, T::RoleId, ValueQuery>;
+    pub type AdminRole<T: Config> = StorageValue<_, T::RoleId, ValueQuery>;
+    #[pallet::storage]
+    pub type ModeratorRole<T: Config> = StorageValue<_, T::RoleId, ValueQuery>;
+    #[pallet::storage]
+    pub type WriterRole<T: Config> = StorageValue<_, T::RoleId, ValueQuery>;
 
-	#[pallet::config]
-	pub trait Config: frame_system::Config {
+    #[pallet::config]
+    pub trait Config: frame_system::Config {
         // other fields from config
         type RoleId: MaxEncodedLen + Decode + EncodeLike + TypeInfo + Default + Clone;
         type RoleInfo: rbac::RoleInfo<Self::RoleId>;
         type RBAC: rbac::Authorize<Self::AccountId, Self::RoleId>
-			+ rbac::AddRole<Self::RoleInfo, Self::RoleId>
-			+ rbac::PreassignRole<Self::AccountId, Self::RoleId>;
+            + rbac::AddRole<Self::RoleId>
+            + rbac::PreassignRole<Self::AccountId, Self::RoleId>;
         type AdminAccount: Get<Self::AccountId>;
     }
 
- 	#[pallet::call]
-	impl<T: Config> Pallet<T> {
-		#[pallet::weight(0)]
-		pub fn authorized_call(origin: OriginFor<T>) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
-			if !<T::RBAC as rbac::Authorize<T::AccountId, T::RoleId>>::authorize(
-				&sender,
-				&[NeededRole::<T>::get()],
-			) {
-				// not authorized
-			}
+     #[pallet::call]
+    impl<T: Config> Pallet<T> {
+        #[pallet::weight(0)]
+        pub fn start_press_release(origin: OriginFor<T>) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            if !<T::RBAC as rbac::Authorize<T::AccountId, T::RoleId>>::authorize(
+                &sender,
+                &[AdminRole::<T>::get()],
+            ) {
+                // not authorized
+            }
             // authorized
-			Ok(())
-		}
-	}
+            Ok(())
+        }
+
+        #[pallet::weight(0)]
+        pub fn submit_writing(origin: OriginFor<T>) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            if !<T::RBAC as rbac::Authorize<T::AccountId, T::RoleId>>::authorize(
+                &sender,
+                &[AdminRole::<T>::get(), ModeratorRole::<T>::get(), WriterRole::<T>::get()],
+            ) {
+                // not authorized
+            }
+            // authorized
+            Ok(())
+        }
+
+        #[pallet::weight(0)]
+        pub fn accept_writing(origin: OriginFor<T>) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            if !<T::RBAC as rbac::Authorize<T::AccountId, T::RoleId>>::authorize(
+                &sender,
+                &[AdminRole::<T>::get(), ModeratorRole::<T>::get()],
+            ) {
+                // not authorized
+            }
+            // authorized
+            Ok(())
+        }
+    }
 
     #[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         fn on_runtime_upgrade() -> Weight {
-            let role_info =
-				<T::RoleInfo as rbac::RoleInfo<T::RoleId>>::new("admin".as_bytes(), &[]);
-			let role_id =
-				<T::RBAC as rbac::AddRole<T::RoleInfo, T::RoleId>>::add_role(role_info, true);
-			NeededRole::<T>::set(role_id.clone());
-			<T::RBAC as rbac::PreassignRole<T::AccountId, T::RoleId>>::preassign_role(
-				T::AdminAccount::get(),
-				role_id,
-			)
-			.expect("there is some problem with setup");
-		    Weight::zero()
-	    }
+            let admin_role_id =
+                <T::RBAC as rbac::AddRole<T::RoleId>>::add_role("admin".as_bytes(), &[], true)
+                    .expect("incorrect role created");
+            AdminRole::<T>::set(admin_role_id.clone());
+            let moderator_role_id =
+                <T::RBAC as rbac::AddRole<T::RoleId>>::add_role("moderator".as_bytes(), &[admin_role_id], false)
+                    .expect("incorrect role created");
+            ModeratorRole::<T>::set(moderator_role_id.clone());
+            let writer_role_id =
+                <T::RBAC as rbac::AddRole<T::RoleId>>::add_role(
+                    "writer".as_bytes(),
+                    &[admin_role_id, moderator_role_id], 
+                    false
+                ).expect("incorrect role created");
+            WriterRole::<T>::set(writer_role_id.clone());
+            <T::RBAC as rbac::PreassignRole<T::AccountId, T::RoleId>>::preassign_role(
+                T::AdminAccount::get(),
+                admin_role_id,
+            )
+            .expect("there is some problem with setup");
+            Weight::zero()
+        }
     }
 } 
 ```
+
+### Granting and revoking roles.
+
+For this you will need to call the a dispatchable function (e.g. extrinsic) from any client of your chain. Here are the screenshots with examples of how you can do it ([polkadot app](https://polkadot.js.org/apps/) is used to interact with the chain):
+
+* Grant role:
+![grant role](./assets/grant-role.png)
+
+* Revoke role:
+![revoke role](./assets/revoke-role.png)
 
 ## Implementation decision explanation
 
